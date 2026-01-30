@@ -46,7 +46,6 @@ final class AdminPage {
       'error_fast' => 'Submission too fast. Please try again.',
       'error_expired' => 'Form expired. Please reload and try again.',
       'log_enabled' => 1,
-      'ui_language' => 'default',
     ];
   }
 
@@ -82,9 +81,6 @@ final class AdminPage {
     $out['error_expired'] = sanitize_text_field((string)($in['error_expired'] ?? $out['error_expired']));
 
     $out['log_enabled'] = !empty($in['log_enabled']) ? 1 : 0;
-
-    $lang = (string)($in['ui_language'] ?? 'default');
-    $out['ui_language'] = in_array($lang, ['default','en_US','pt_BR'], true) ? $lang : 'default';
 
     return $out;
   }
@@ -152,109 +148,6 @@ final class AdminPage {
       echo '<hr />';
       $this->checkbox(self::OPT . '[log_enabled]', !empty($s['log_enabled']), 'Enable logs (recommended)');
       echo '<p class="bcmpro-help">Keeps last 200 block events. View them in the Logs tab.</p>';
-
-      echo '<hr />';
-      echo '<h2>Language</h2>';
-      echo '<p class="bcmpro-help">Select the plugin UI language.</p>';
-      $this->select(self::OPT . '[ui_language]', (string)($s['ui_language'] ?? 'default'), 'UI language', [
-        'default' => 'Auto (WordPress)',
-        'en_US' => 'English (US)',
-        'pt_BR' => 'Português (Brasil)',
-      ]);
-      echo '</div>';
-    }
-
-    if ($tab === 'messages') {
-      echo '<div class="bcmpro-card">';
-      echo '<h2>Messages</h2>';
-      echo '<p class="bcmpro-help">Customize what users see when a request is blocked.</p>';
-
-      $this->text(self::OPT . '[error_spam]', (string)$s['error_spam'], 'Spam message');
-      $this->text(self::OPT . '[error_nonce]', (string)$s['error_nonce'], 'Nonce/CSRF message');
-      $this->text(self::OPT . '[error_fast]', (string)$s['error_fast'], 'Too-fast message');
-      $this->text(self::OPT . '[error_expired]', (string)$s['error_expired'], 'Expired message');
-
-      echo '<p class="bcmpro-help">Keep messages short and generic (avoid giving hints to bots).</p>';
-      echo '</div>';
-
-      echo '<div class="bcmpro-card">';
-      echo '<h2>Notes</h2>';
-      echo '<ul class="bcmpro-help" style="margin-left:18px">';
-      echo '<li>If you use a custom comment/registration form that does not use WP hooks, protection may not apply.</li>';
-      echo '<li>For heavy spam, you can increase minimum time to 5–8 seconds.</li>';
-      echo '</ul>';
-      echo '</div>';
-    }
-
-    echo '</div>';
-
-    submit_button();
-    echo '</form>';
-
-    echo '</div>';
-  }
-
-  private function tab_link(string $base, string $key, string $active, string $label): void {
-    $url = add_query_arg(['tab' => $key], $base);
-    $cls = 'nav-tab' . ($active === $key ? ' nav-tab-active' : '');
-    echo '<a class="' . esc_attr($cls) . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
-  }
-
-  private function checkbox(string $name, bool $checked, string $label): void {
-    echo '<label><input type="checkbox" name="' . esc_attr($name) . '" value="1" ' . checked(true, $checked, false) . '> ' . esc_html($label) . '</label>';
-  }
-
-  private function number(string $name, int $value, int $min, int $max, string $label): void {
-    echo '<p><strong>' . esc_html($label) . '</strong><br>';
-    echo '<input type="number" class="small-text" name="' . esc_attr($name) . '" value="' . esc_attr((string)$value) . '" min="' . esc_attr((string)$min) . '" max="' . esc_attr((string)$max) . '"></p>';
-  }
-
-  private function text(string $name, string $value, string $label): void {
-    echo '<p><strong>' . esc_html($label) . '</strong><br>';
-    echo '<input type="text" class="regular-text" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"></p>';
-  }
-
-  private function select(string $name, string $value, string $label, array $options): void {
-    echo '<p><strong>' . esc_html($label) . '</strong><br>';
-    echo '<select name="' . esc_attr($name) . '">';
-    foreach ($options as $k => $lbl) {
-      echo '<option value="' . esc_attr((string)$k) . '" ' . selected((string)$k, $value, false) . '>' . esc_html((string)$lbl) . '</option>';
-    }
-    echo '</select></p>';
-  }
-
-  private function textarea(string $name, string $value, string $label): void {
-    echo '<p><strong>' . esc_html($label) . '</strong><br>';
-    echo '<textarea class="large-text code" rows="6" name="' . esc_attr($name) . '">' . esc_textarea($value) . '</textarea></p>';
-  }
-
-  private function render_logs(): void {
-    $logs = get_option('bcm_protection_logs', []);
-    if (!is_array($logs)) {
-      $logs = [];
-    }
-
-    echo '<div class="bcmpro-card">';
-    echo '<h2>Logs</h2>';
-    echo '<p class="bcmpro-help">Recent blocked requests (last 50 shown).</p>';
-
-    if (!$logs) {
-      echo '<p>No logs yet.</p>';
-      echo '</div>';
-      return;
-    }
-
-    echo '<div class="bcmpro-log"><code>';
-    foreach (array_slice($logs, 0, 50) as $row) {
-      if (!is_array($row)) continue;
-      $line = sprintf(
-        '[%s] context=%s reason=%s ip=%s ua=%s',
-        gmdate('Y-m-d H:i:s', (int)($row['ts'] ?? 0)),
-        (string)($row['context'] ?? ''),
-        (string)($row['reason'] ?? ''),
-        (string)($row['ip'] ?? ''),
-        (string)($row['ua'] ?? '')
-      );
       echo esc_html($line) . "\n";
     }
     echo '</code></div>';
