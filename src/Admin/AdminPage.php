@@ -7,6 +7,21 @@ final class AdminPage {
   public function hooks(): void {
     add_action('admin_menu', [$this, 'admin_menu']);
     add_action('admin_init', [$this, 'register_settings']);
+    add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+  }
+
+  public function enqueue_assets(string $hook): void {
+    // Tools → BCM Protection
+    if ($hook !== 'tools_page_bcm-protection') {
+      return;
+    }
+
+    wp_enqueue_style(
+      'bcm-protection-admin',
+      plugins_url('assets/admin.css', BCM_PROTECTION_FILE),
+      [],
+      BCM_PROTECTION_VERSION
+    );
   }
 
   public function admin_menu(): void {
@@ -48,63 +63,6 @@ final class AdminPage {
       'sanitize_callback' => [$this, 'sanitize'],
       'default' => self::defaults(),
     ]);
-
-    add_settings_section('bcm_protection_main', __('Protection', 'bcm-protection'), function () {
-      echo '<p>Anti-bot checks for comment and registration forms. Default settings are safe for most sites.</p>';
-    }, 'bcm-protection');
-
-    $this->add_checkbox('enabled_comments', 'Enable on comments');
-    $this->add_checkbox('enabled_register', 'Enable on registration');
-    $this->add_number('min_seconds', 'Minimum submit time (seconds)', 1, 120);
-    $this->add_number('max_age_hours', 'Max form age (hours)', 1, 168);
-    $this->add_textarea('whitelist_ips', 'Allowlist IPs (one per line)');
-
-    add_settings_section('bcm_protection_messages', __('Messages', 'bcm-protection'), function () {
-      echo '<p>Customize the messages shown when a request is blocked.</p>';
-    }, 'bcm-protection');
-
-    $this->add_text('error_spam', 'Spam message');
-    $this->add_text('error_nonce', 'Nonce/CSRF message');
-    $this->add_text('error_fast', 'Too-fast message');
-    $this->add_text('error_expired', 'Expired message');
-
-    add_settings_section('bcm_protection_logs', __('Logging', 'bcm-protection'), function () {
-      echo '<p>Logs are stored locally (last 200 entries). Useful for debugging.</p>';
-    }, 'bcm-protection');
-    $this->add_checkbox('log_enabled', 'Enable logs');
-  }
-
-  private function add_checkbox(string $key, string $label): void {
-    add_settings_field('bcm_' . $key, esc_html($label), function () use ($key) {
-      $s = self::get_settings();
-      $val = !empty($s[$key]) ? 1 : 0;
-      echo '<label><input type="checkbox" name="' . esc_attr(self::OPT) . '[' . esc_attr($key) . ']" value="1" ' . checked(1, $val, false) . '> ' . esc_html__('Enabled', 'bcm-protection') . '</label>';
-    }, 'bcm-protection', 'bcm_protection_main');
-  }
-
-  private function add_number(string $key, string $label, int $min, int $max): void {
-    add_settings_field('bcm_' . $key, esc_html($label), function () use ($key, $min, $max) {
-      $s = self::get_settings();
-      $val = isset($s[$key]) ? (int)$s[$key] : 0;
-      echo '<input type="number" name="' . esc_attr(self::OPT) . '[' . esc_attr($key) . ']" value="' . esc_attr((string)$val) . '" min="' . esc_attr((string)$min) . '" max="' . esc_attr((string)$max) . '" class="small-text">';
-    }, 'bcm-protection', 'bcm_protection_main');
-  }
-
-  private function add_textarea(string $key, string $label): void {
-    add_settings_field('bcm_' . $key, esc_html($label), function () use ($key) {
-      $s = self::get_settings();
-      $val = isset($s[$key]) ? (string)$s[$key] : '';
-      echo '<textarea name="' . esc_attr(self::OPT) . '[' . esc_attr($key) . ']" rows="5" class="large-text code">' . esc_textarea($val) . '</textarea>';
-      echo '<p class="description">If your IP is allowlisted, protection checks are skipped for you.</p>';
-    }, 'bcm-protection', 'bcm_protection_main');
-  }
-
-  private function add_text(string $key, string $label): void {
-    add_settings_field('bcm_' . $key, esc_html($label), function () use ($key) {
-      $s = self::get_settings();
-      $val = isset($s[$key]) ? (string)$s[$key] : '';
-      echo '<input type="text" name="' . esc_attr(self::OPT) . '[' . esc_attr($key) . ']" value="' . esc_attr($val) . '" class="large-text">';
-    }, 'bcm-protection', 'bcm_protection_messages');
   }
 
   public function sanitize($input): array {
@@ -113,10 +71,8 @@ final class AdminPage {
 
     $out['enabled_comments'] = !empty($in['enabled_comments']) ? 1 : 0;
     $out['enabled_register'] = !empty($in['enabled_register']) ? 1 : 0;
-
     $out['min_seconds'] = max(1, min(120, (int)($in['min_seconds'] ?? $out['min_seconds'])));
     $out['max_age_hours'] = max(1, min(168, (int)($in['max_age_hours'] ?? $out['max_age_hours'])));
-
     $out['whitelist_ips'] = sanitize_textarea_field((string)($in['whitelist_ips'] ?? ''));
 
     $out['error_spam'] = sanitize_text_field((string)($in['error_spam'] ?? $out['error_spam']));
@@ -134,39 +90,152 @@ final class AdminPage {
       return;
     }
 
+    $tab = isset($_GET['tab']) ? sanitize_key((string)$_GET['tab']) : 'protection';
+    if (!in_array($tab, ['protection', 'messages', 'logs'], true)) {
+      $tab = 'protection';
+    }
+
+    $s = self::get_settings();
+
+    echo '<div class="wrap bcmpro-wrap">';
+    echo '<h1>BCM Protection</h1>';
+
+    echo '<p class="bcmpro-help">Anti-bot/spam protection for Comments and User Registration. No external services.</p>';
+
+    // Tabs
+    $base = admin_url('tools.php?page=bcm-protection');
+    echo '<h2 class="nav-tab-wrapper">';
+    $this->tab_link($base, 'protection', $tab, 'Protection');
+    $this->tab_link($base, 'messages', $tab, 'Messages');
+    $this->tab_link($base, 'logs', $tab, 'Logs');
+    echo '</h2>';
+
+    if ($tab === 'logs') {
+      $this->render_logs();
+      echo '</div>';
+      return;
+    }
+
+    echo '<form method="post" action="options.php">';
+    settings_fields('bcm_protection');
+
+    echo '<div class="bcmpro-grid">';
+
+    if ($tab === 'protection') {
+      echo '<div class="bcmpro-card">';
+      echo '<h2>Protection</h2>';
+      echo '<p class="bcmpro-help">Choose where to apply the protection and tune the timing checks.</p>';
+
+      $this->checkbox(self::OPT . '[enabled_comments]', !empty($s['enabled_comments']), 'Enable on comments');
+      echo '<br>';
+      $this->checkbox(self::OPT . '[enabled_register]', !empty($s['enabled_register']), 'Enable on registration');
+
+      echo '<hr />';
+
+      $this->number(self::OPT . '[min_seconds]', (int)$s['min_seconds'], 1, 120, 'Minimum submit time (seconds)');
+      echo '<p class="bcmpro-help">Bots often submit instantly. Default: 3 seconds.</p>';
+
+      $this->number(self::OPT . '[max_age_hours]', (int)$s['max_age_hours'], 1, 168, 'Max form age (hours)');
+      echo '<p class="bcmpro-help">Helps prevent replay of cached/old forms. Default: 12 hours.</p>';
+      echo '</div>';
+
+      echo '<div class="bcmpro-card">';
+      echo '<h2>Allowlist</h2>';
+      echo '<p class="bcmpro-help">Requests from allowlisted IPs will bypass checks (useful for your own testing).</p>';
+      $this->textarea(self::OPT . '[whitelist_ips]', (string)$s['whitelist_ips'], 'Allowlist IPs (one per line)');
+      echo '<p class="bcmpro-warn"><strong>Tip:</strong> do not allowlist wide ranges unless you really trust them.</p>';
+
+      echo '<hr />';
+      $this->checkbox(self::OPT . '[log_enabled]', !empty($s['log_enabled']), 'Enable logs (recommended)');
+      echo '<p class="bcmpro-help">Keeps last 200 block events. View them in the Logs tab.</p>';
+      echo '</div>';
+    }
+
+    if ($tab === 'messages') {
+      echo '<div class="bcmpro-card">';
+      echo '<h2>Messages</h2>';
+      echo '<p class="bcmpro-help">Customize what users see when a request is blocked.</p>';
+
+      $this->text(self::OPT . '[error_spam]', (string)$s['error_spam'], 'Spam message');
+      $this->text(self::OPT . '[error_nonce]', (string)$s['error_nonce'], 'Nonce/CSRF message');
+      $this->text(self::OPT . '[error_fast]', (string)$s['error_fast'], 'Too-fast message');
+      $this->text(self::OPT . '[error_expired]', (string)$s['error_expired'], 'Expired message');
+
+      echo '<p class="bcmpro-help">Keep messages short and generic (avoid giving hints to bots).</p>';
+      echo '</div>';
+
+      echo '<div class="bcmpro-card">';
+      echo '<h2>Notes</h2>';
+      echo '<ul class="bcmpro-help" style="margin-left:18px">';
+      echo '<li>If you use a custom comment/registration form that does not use WP hooks, protection may not apply.</li>';
+      echo '<li>For heavy spam, you can increase minimum time to 5–8 seconds.</li>';
+      echo '</ul>';
+      echo '</div>';
+    }
+
+    echo '</div>';
+
+    submit_button();
+    echo '</form>';
+
+    echo '</div>';
+  }
+
+  private function tab_link(string $base, string $key, string $active, string $label): void {
+    $url = add_query_arg(['tab' => $key], $base);
+    $cls = 'nav-tab' . ($active === $key ? ' nav-tab-active' : '');
+    echo '<a class="' . esc_attr($cls) . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
+  }
+
+  private function checkbox(string $name, bool $checked, string $label): void {
+    echo '<label><input type="checkbox" name="' . esc_attr($name) . '" value="1" ' . checked(true, $checked, false) . '> ' . esc_html($label) . '</label>';
+  }
+
+  private function number(string $name, int $value, int $min, int $max, string $label): void {
+    echo '<p><strong>' . esc_html($label) . '</strong><br>';
+    echo '<input type="number" class="small-text" name="' . esc_attr($name) . '" value="' . esc_attr((string)$value) . '" min="' . esc_attr((string)$min) . '" max="' . esc_attr((string)$max) . '"></p>';
+  }
+
+  private function text(string $name, string $value, string $label): void {
+    echo '<p><strong>' . esc_html($label) . '</strong><br>';
+    echo '<input type="text" class="regular-text" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"></p>';
+  }
+
+  private function textarea(string $name, string $value, string $label): void {
+    echo '<p><strong>' . esc_html($label) . '</strong><br>';
+    echo '<textarea class="large-text code" rows="6" name="' . esc_attr($name) . '">' . esc_textarea($value) . '</textarea></p>';
+  }
+
+  private function render_logs(): void {
     $logs = get_option('bcm_protection_logs', []);
     if (!is_array($logs)) {
       $logs = [];
     }
 
-    echo '<div class="wrap">';
-    echo '<h1>BCM Protection</h1>';
-    echo '<form method="post" action="options.php">';
-    settings_fields('bcm_protection');
-    do_settings_sections('bcm-protection');
-    submit_button();
-    echo '</form>';
-
-    echo '<hr />';
-    echo '<h2>Recent blocks</h2>';
+    echo '<div class="bcmpro-card">';
+    echo '<h2>Logs</h2>';
+    echo '<p class="bcmpro-help">Recent blocked requests (last 50 shown).</p>';
 
     if (!$logs) {
       echo '<p>No logs yet.</p>';
-    } else {
-      echo '<table class="widefat striped"><thead><tr><th>Time (UTC)</th><th>Context</th><th>Reason</th><th>IP</th><th>UA</th></tr></thead><tbody>';
-      foreach (array_slice($logs, 0, 50) as $row) {
-        if (!is_array($row)) continue;
-        echo '<tr>';
-        echo '<td>' . esc_html(gmdate('Y-m-d H:i:s', (int)($row['ts'] ?? 0))) . '</td>';
-        echo '<td>' . esc_html((string)($row['context'] ?? '')) . '</td>';
-        echo '<td>' . esc_html((string)($row['reason'] ?? '')) . '</td>';
-        echo '<td><code>' . esc_html((string)($row['ip'] ?? '')) . '</code></td>';
-        echo '<td style="max-width:520px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' . esc_html((string)($row['ua'] ?? '')) . '</td>';
-        echo '</tr>';
-      }
-      echo '</tbody></table>';
-      echo '<p class="description">Showing last 50 entries.</p>';
+      echo '</div>';
+      return;
     }
+
+    echo '<div class="bcmpro-log"><code>';
+    foreach (array_slice($logs, 0, 50) as $row) {
+      if (!is_array($row)) continue;
+      $line = sprintf(
+        '[%s] context=%s reason=%s ip=%s ua=%s',
+        gmdate('Y-m-d H:i:s', (int)($row['ts'] ?? 0)),
+        (string)($row['context'] ?? ''),
+        (string)($row['reason'] ?? ''),
+        (string)($row['ip'] ?? ''),
+        (string)($row['ua'] ?? '')
+      );
+      echo esc_html($line) . "\n";
+    }
+    echo '</code></div>';
 
     echo '</div>';
   }

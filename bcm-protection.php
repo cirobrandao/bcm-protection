@@ -3,7 +3,7 @@
  * Plugin Name:       BCM Protection
  * Plugin URI:        https://github.com/cirobrandao/bcm-protection
  * Description:       Lightweight anti-bot/spam protection for comments and user registrations (honeypot + timing + basic heuristics).
- * Version:           0.2.0
+ * Version:           0.2.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            BCM Network
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
   exit;
 }
 
-define('BCM_PROTECTION_VERSION', '0.2.0');
+define('BCM_PROTECTION_VERSION', '0.2.1');
 define('BCM_PROTECTION_FILE', __FILE__);
 define('BCM_PROTECTION_DIR', plugin_dir_path(__FILE__));
 

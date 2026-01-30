@@ -1,0 +1,9 @@
+.bcmpro-wrap{max-width:1100px}
+.bcmpro-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
+@media (max-width: 900px){.bcmpro-grid{grid-template-columns:1fr}}
+.bcmpro-card{background:#fff;border:1px solid #ccd0d4;border-radius:8px;padding:16px}
+.bcmpro-card h2{margin-top:0}
+.bcmpro-help{color:#646970;margin-top:6px}
+.bcmpro-warn{color:#b32d2e;margin-top:6px}
+.bcmpro-log{max-height:320px;overflow:auto;background:#0b1020;color:#d6deeb;border-radius:8px;padding:12px}
+.bcmpro-log code{color:inherit}
