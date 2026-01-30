@@ -1,6 +1,7 @@
 <?php
 namespace BCMProtection;
 
+use BCMProtection\Admin\AdminPage;
 use BCMProtection\Frontend\Honeypot;
 use BCMProtection\Util\Checks;
 
@@ -17,11 +18,17 @@ final class Plugin {
   public function boot(): void {
     (new Honeypot())->hooks();
 
+    if (is_admin()) {
+      (new AdminPage())->hooks();
+    }
+
     // Comments
     add_filter('preprocess_comment', function ($commentdata) {
+      if (!Checks::is_enabled('comments')) {
+        return $commentdata;
+      }
       $err = Checks::validate_request('comment');
       if ($err) {
-        // Using wp_die blocks spam before insert.
         wp_die(esc_html($err), 'BCM Protection', ['response' => 403]);
       }
       return $commentdata;
@@ -29,6 +36,9 @@ final class Plugin {
 
     // Registrations (wp-login.php?action=register)
     add_filter('registration_errors', function ($errors, $sanitized_user_login, $user_email) {
+      if (!Checks::is_enabled('register')) {
+        return $errors;
+      }
       $err = Checks::validate_request('register');
       if ($err) {
         $errors->add('bcm_protection', $err);
