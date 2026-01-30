@@ -1,0 +1,59 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: BCM Protection\n"
+"POT-Creation-Date: 2026-01-30 00:00+0000\n"
+"PO-Revision-Date: 2026-01-30 00:00+0000\n"
+"Last-Translator: BCM Network\n"
+"Language-Team: pt_BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "BCM Protection"
+msgstr "BCM Protection"
+
+msgid "Anti-bot/spam protection for Comments and User Registration. No external services."
+msgstr "Proteção anti-bot/spam para Comentários e Registro de Usuários. Sem serviços externos."
+
+msgid "Protection"
+msgstr "Proteção"
+
+msgid "Messages"
+msgstr "Mensagens"
+
+msgid "Logs"
+msgstr "Logs"
+
+msgid "Choose where to apply the protection and tune the timing checks."
+msgstr "Escolha onde aplicar a proteção e ajuste as verificações de tempo."
+
+msgid "Enable on comments"
+msgstr "Ativar em comentários"
+
+msgid "Enable on registration"
+msgstr "Ativar no registro"
+
+msgid "Minimum submit time (seconds)"
+msgstr "Tempo mínimo de envio (segundos)"
+
+msgid "Max form age (hours)"
+msgstr "Idade máxima do formulário (horas)"
+
+msgid "Allowlist"
+msgstr "Lista de permissão"
+
+msgid "Allowlist IPs (one per line)"
+msgstr "IPs permitidos (um por linha)"
+
+msgid "Enable logs (recommended)"
+msgstr "Ativar logs (recomendado)"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "UI language"
+msgstr "Idioma da interface"
+
+msgid "Select the plugin UI language."
+msgstr "Selecione o idioma da interface do plugin."

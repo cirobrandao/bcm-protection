@@ -46,6 +46,7 @@ final class AdminPage {
       'error_fast' => 'Submission too fast. Please try again.',
       'error_expired' => 'Form expired. Please reload and try again.',
       'log_enabled' => 1,
+      'ui_language' => 'default',
     ];
   }
 
@@ -81,6 +82,9 @@ final class AdminPage {
     $out['error_expired'] = sanitize_text_field((string)($in['error_expired'] ?? $out['error_expired']));
 
     $out['log_enabled'] = !empty($in['log_enabled']) ? 1 : 0;
+
+    $lang = (string)($in['ui_language'] ?? 'default');
+    $out['ui_language'] = in_array($lang, ['default','en_US','pt_BR'], true) ? $lang : 'default';
 
     return $out;
   }
@@ -148,6 +152,15 @@ final class AdminPage {
       echo '<hr />';
       $this->checkbox(self::OPT . '[log_enabled]', !empty($s['log_enabled']), 'Enable logs (recommended)');
       echo '<p class="bcmpro-help">Keeps last 200 block events. View them in the Logs tab.</p>';
+
+      echo '<hr />';
+      echo '<h2>Language</h2>';
+      echo '<p class="bcmpro-help">Select the plugin UI language.</p>';
+      $this->select(self::OPT . '[ui_language]', (string)($s['ui_language'] ?? 'default'), 'UI language', [
+        'default' => 'Auto (WordPress)',
+        'en_US' => 'English (US)',
+        'pt_BR' => 'Português (Brasil)',
+      ]);
       echo '</div>';
     }
 
@@ -199,6 +212,15 @@ final class AdminPage {
   private function text(string $name, string $value, string $label): void {
     echo '<p><strong>' . esc_html($label) . '</strong><br>';
     echo '<input type="text" class="regular-text" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"></p>';
+  }
+
+  private function select(string $name, string $value, string $label, array $options): void {
+    echo '<p><strong>' . esc_html($label) . '</strong><br>';
+    echo '<select name="' . esc_attr($name) . '">';
+    foreach ($options as $k => $lbl) {
+      echo '<option value="' . esc_attr((string)$k) . '" ' . selected((string)$k, $value, false) . '>' . esc_html((string)$lbl) . '</option>';
+    }
+    echo '</select></p>';
   }
 
   private function textarea(string $name, string $value, string $label): void {
