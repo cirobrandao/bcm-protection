@@ -3,11 +3,13 @@ namespace BCMProtection\Admin;
 
 final class AdminPage {
   private const OPT = 'bcm_protection_settings';
+  private const LOG_OPT = 'bcm_protection_logs';
 
   public function hooks(): void {
     add_action('admin_menu', [$this, 'admin_menu']);
     add_action('admin_init', [$this, 'register_settings']);
     add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+    add_action('admin_post_bcm_protection_clear_logs', [$this, 'handle_clear_logs']);
   }
 
   public function enqueue_assets(string $hook): void {
@@ -85,6 +87,97 @@ final class AdminPage {
     return $out;
   }
 
+  public function handle_clear_logs(): void {
+    if (!current_user_can('manage_options')) {
+      wp_die('Sem permissão.');
+    }
+    check_admin_referer('bcm_protection_clear_logs');
+
+    update_option(self::LOG_OPT, [], false);
+
+    wp_safe_redirect(admin_url('tools.php?page=bcm-protection&tab=logs&msg=' . rawurlencode('Logs limpos.')));
+    exit;
+  }
+
+  private function tab_link(string $base, string $key, string $current, string $label): void {
+    $url = add_query_arg(['tab' => $key], $base);
+    $cls = ($key === $current) ? 'nav-tab nav-tab-active' : 'nav-tab';
+    echo '<a class="' . esc_attr($cls) . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
+  }
+
+  private function checkbox(string $name, bool $checked, string $label): void {
+    printf(
+      '<label><input type="checkbox" name="%s" value="1" %s> %s</label>',
+      esc_attr($name),
+      checked($checked, true, false),
+      esc_html($label)
+    );
+  }
+
+  private function number(string $name, int $value, int $min, int $max, string $label): void {
+    printf(
+      '<p><label><strong>%s</strong><br><input type="number" class="small-text" name="%s" value="%d" min="%d" max="%d"></label></p>',
+      esc_html($label),
+      esc_attr($name),
+      (int)$value,
+      (int)$min,
+      (int)$max
+    );
+  }
+
+  private function textarea(string $name, string $value, string $label): void {
+    printf(
+      '<p><label><strong>%s</strong><br><textarea name="%s" rows="6" class="large-text code">%s</textarea></label></p>',
+      esc_html($label),
+      esc_attr($name),
+      esc_textarea($value)
+    );
+  }
+
+  private function render_logs(): void {
+    $logs = get_option(self::LOG_OPT, []);
+    if (!is_array($logs)) {
+      $logs = [];
+    }
+
+    echo '<div class="bcmpro-card">';
+    echo '<h2>Logs</h2>';
+
+    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+    wp_nonce_field('bcm_protection_clear_logs');
+    echo '<input type="hidden" name="action" value="bcm_protection_clear_logs" />';
+    submit_button('Limpar logs', 'secondary', 'submit', false);
+    echo '</form>';
+
+    if (!$logs) {
+      echo '<p class="bcmpro-help">Nenhum evento registrado ainda.</p>';
+      echo '</div>';
+      return;
+    }
+
+    echo '<table class="widefat striped" style="margin-top:12px">';
+    echo '<thead><tr><th>Data</th><th>Contexto</th><th>Motivo</th><th>IP</th><th>User-Agent</th></tr></thead><tbody>';
+    foreach ($logs as $row) {
+      $ts = (int)($row['ts'] ?? 0);
+      $date = $ts ? date_i18n('Y-m-d H:i:s', $ts) : '-';
+      $context = (string)($row['context'] ?? '');
+      $reason = (string)($row['reason'] ?? '');
+      $ip = (string)($row['ip'] ?? '');
+      $ua = (string)($row['ua'] ?? '');
+
+      echo '<tr>';
+      echo '<td>' . esc_html($date) . '</td>';
+      echo '<td><code>' . esc_html($context) . '</code></td>';
+      echo '<td><code>' . esc_html($reason) . '</code></td>';
+      echo '<td><code>' . esc_html($ip) . '</code></td>';
+      echo '<td style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' . esc_attr($ua) . '">' . esc_html($ua) . '</td>';
+      echo '</tr>';
+    }
+    echo '</tbody></table>';
+
+    echo '</div>';
+  }
+
   public function render(): void {
     if (!current_user_can('manage_options')) {
       return;
@@ -101,6 +194,10 @@ final class AdminPage {
     echo '<h1>BCM Protection</h1>';
 
     echo '<p class="bcmpro-help">Anti-bot/spam protection for Comments and User Registration. No external services.</p>';
+
+    if (!empty($_GET['msg'])) {
+      echo '<div class="notice notice-success"><p>' . esc_html((string)$_GET['msg']) . '</p></div>';
+    }
 
     // Tabs
     $base = admin_url('tools.php?page=bcm-protection');
@@ -137,20 +234,37 @@ final class AdminPage {
 
       $this->number(self::OPT . '[max_age_hours]', (int)$s['max_age_hours'], 1, 168, 'Max form age (hours)');
       echo '<p class="bcmpro-help">Helps prevent replay of cached/old forms. Default: 12 hours.</p>';
+
       echo '</div>';
 
       echo '<div class="bcmpro-card">';
       echo '<h2>Allowlist</h2>';
       echo '<p class="bcmpro-help">Requests from allowlisted IPs will bypass checks (useful for your own testing).</p>';
       $this->textarea(self::OPT . '[whitelist_ips]', (string)$s['whitelist_ips'], 'Allowlist IPs (one per line)');
-      echo '<p class="bcmpro-warn"><strong>Tip:</strong> do not allowlist wide ranges unless you really trust them.</p>';
 
       echo '<hr />';
       $this->checkbox(self::OPT . '[log_enabled]', !empty($s['log_enabled']), 'Enable logs (recommended)');
       echo '<p class="bcmpro-help">Keeps last 200 block events. View them in the Logs tab.</p>';
-      echo esc_html($line) . "\n";
+      echo '</div>';
     }
-    echo '</code></div>';
+
+    if ($tab === 'messages') {
+      echo '<div class="bcmpro-card">';
+      echo '<h2>Messages</h2>';
+      echo '<p class="bcmpro-help">Customize the error messages returned when a request is blocked.</p>';
+
+      $this->textarea(self::OPT . '[error_spam]', (string)$s['error_spam'], 'Spam message');
+      $this->textarea(self::OPT . '[error_nonce]', (string)$s['error_nonce'], 'Nonce/CSRF message');
+      $this->textarea(self::OPT . '[error_fast]', (string)$s['error_fast'], 'Too-fast message');
+      $this->textarea(self::OPT . '[error_expired]', (string)$s['error_expired'], 'Expired form message');
+
+      echo '</div>';
+    }
+
+    echo '</div>'; // grid
+
+    submit_button('Salvar');
+    echo '</form>';
 
     echo '</div>';
   }
